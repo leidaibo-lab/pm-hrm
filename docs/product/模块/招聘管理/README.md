@@ -14,11 +14,15 @@
 
 ## 招聘PRD内阅读导航
 
-- [业务数据、对象、角色泳道、状态与异常](产品需求文档.md#diagrams)。
-- [页面交互与按钮操作](产品需求文档.md#ui)。
-- [职位字段与接任](产品需求文档.md#fields-job)、[应聘资料与简历](产品需求文档.md#fields-candidate)、[筛选邀约](产品需求文档.md#fields-screen-invite)。
-- [模板与场次](产品需求文档.md#fields-session)、[面试配置](产品需求文档.md#config)、[评价与决策](产品需求文档.md#fields-evaluation)。
-- [业务待办、逾期与提醒](产品需求文档.md#tasks)。
+- [目标与范围](产品需求文档.md#goals-scope)、[角色与权限](产品需求文档.md#roles-permissions)、[业务概览](产品需求文档.md#business-overview)。
+- [职位](产品需求文档.md#job-management)、[应聘资料](产品需求文档.md#candidate-management)、[筛选邀约](产品需求文档.md#screen-invite)、[场次](产品需求文档.md#sessions)、[评价决策](产品需求文档.md#evaluation-decision)、[工作台](产品需求文档.md#workbench)：职位及应聘资料内按列表、详情、新增／编辑共用表单阅读；其他功能按详情区域、配置页或弹窗定义。
+- [共用异常](产品需求文档.md#shared-exceptions)、[共享配套与依赖](产品需求文档.md#data-dependencies)、[非功能要求](产品需求文档.md#nonfunctional)、[验收交付](产品需求文档.md#acceptance-delivery)。
+
+### 页面阅读入口
+
+- 职位：[列表](产品需求文档.md#job-list-page)、[新增／编辑](产品需求文档.md#job-form-page)、[详情](产品需求文档.md#job-detail-page)。
+- 候选人：[列表](产品需求文档.md#candidate-list-page)、[新增／编辑](产品需求文档.md#candidate-form-page)、[详情](产品需求文档.md#candidate-detail-page)、[重复对比](产品需求文档.md#duplicate-compare-page)。
+- 对应[页面交互验收](../../验收与追踪/招聘管理验收附件.md#page-interaction-acceptance)覆盖载体、保存／取消、返回上下文及列表查询分页。
 
 ## 研发宣讲与联合交接
 
