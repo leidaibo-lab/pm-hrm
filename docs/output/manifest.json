@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "project": "pm-hrm",
+  "source": {
+    "branch": "main",
+    "path": "docs/output"
+  },
+  "documents": [
+    {
+      "key": "overview",
+      "title": "产品项目总览",
+      "path": "产品项目总览.md",
+      "parentKey": "root",
+      "order": 1,
+      "publish": true
+    },
+    {
+      "key": "base-prd",
+      "title": "基础资料管理PRD",
+      "path": "基础资料管理PRD.md",
+      "parentKey": "overview",
+      "order": 1,
+      "publish": true
+    },
+    {
+      "key": "recruitment-prd",
+      "title": "招聘管理PRD",
+      "path": "招聘管理PRD.md",
+      "parentKey": "overview",
+      "order": 2,
+      "publish": true
+    },
+    {
+      "key": "recruitment-acceptance",
+      "title": "招聘管理验收附件",
+      "path": "招聘管理验收附件.md",
+      "parentKey": "overview",
+      "order": 3,
+      "publish": true
+    },
+    {
+      "key": "field-validation",
+      "title": "字段与表单校验规范",
+      "path": "公共规范/字段与表单校验规范.md",
+      "parentKey": "overview",
+      "order": 4,
+      "publish": true
+    },
+    {
+      "key": "permission-governance",
+      "title": "权限与数据治理规范",
+      "path": "公共规范/权限与数据治理规范.md",
+      "parentKey": "overview",
+      "order": 5,
+      "publish": true
+    },
+    {
+      "key": "metrics-baseline",
+      "title": "指标与试点基线",
+      "path": "指标与试点基线.md",
+      "parentKey": "overview",
+      "order": 6,
+      "publish": true
+    },
+    {
+      "key": "delivery-entry",
+      "title": "产品交付与宣讲入口",
+      "path": "README.md",
+      "parentKey": "overview",
+      "order": 7,
+      "publish": true
+    }
+  ]
+}
