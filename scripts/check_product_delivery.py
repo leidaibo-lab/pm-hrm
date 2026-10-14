@@ -13,8 +13,29 @@ BODY_FORBIDDEN = (
 )
 
 
+PAGE_TABLE_HEADERS = {
+    '按钮': ('按钮名称', '所在位置', '操作权限', '前置条件', '点击行为', '确认要求', '成功结果', '异常反馈'),
+    '输入字段': ('字段名称', '业务含义', '数据类型', '控件类型', '取值来源', '默认值', '必填条件', '校验规则', '修改与历史'),
+    '筛选项': ('字段名称', '数据类型', '控件类型', '取值来源', '默认值', '筛选规则'),
+    '展示字段': ('字段名称', '数据类型', '取值来源', '展示规则', '空值展示', '交互说明'),
+}
+
+
+def page_table_kind(cells):
+    # 对象事实及区域概览不属于这四类页面规格。
+    if '按钮名称' in cells:
+        return '按钮'
+    if '业务含义' in cells and any(x in cells for x in ('控件', '控件类型')):
+        return '输入字段'
+    if any(x in cells for x in ('筛选说明', '筛选规则')):
+        return '筛选项'
+    if '展示规则' in cells and '空值展示' in cells:
+        return '展示字段'
+    return None
+
+
 def visible_text(text):
-    # 旧锚点是兼容定位标识，不是给读者的内部决策引用。
+    # 显式定位标识不属于可见正文。
     text = re.sub(r'<a\s+id="[^"]+"\s*></a>', '', text)
     return re.sub(r'<!--.*?-->', '', text, flags=re.S)
 
@@ -49,13 +70,19 @@ def review(documents, output_root, expected=None):
             for match in re.finditer(pattern, body):
                 line = body[:match.start()].count('\n') + 1
                 errors.append(f'{path.name}:{line} {label}：{match[0]}')
+        version_section = re.search(r'^## (?:版本与变更记录|版本记录)\n', text, re.M)
+        if version_section:
+            preceding = re.findall(r'^## (.+)$', text[:version_section.start()], re.M)
+            if preceding and preceding != ['1 文档信息'] and preceding != ['文档信息']:
+                errors.append(f'{path.name} 版本变更记录须位于顶部或文档信息之后')
         explicit = re.findall(r'<a\s+id="([^"]+)"\s*></a>', text)
         duplicates = {a for a in explicit if explicit.count(a) > 1}
         if duplicates:
             errors.append(f'{path.name} 显式锚点重复：{sorted(duplicates)}')
         fenced, table_width = False, None
         headings = {}
-        for number, line in enumerate(text.splitlines(), 1):
+        document_lines = text.splitlines()
+        for number, line in enumerate(document_lines, 1):
             if line.startswith('```'):
                 fenced = not fenced
                 continue
@@ -66,6 +93,12 @@ def review(documents, output_root, expected=None):
                 if table_width is not None and width != table_width:
                     errors.append(f'{path.name}:{number} 表格列数不一致')
                 table_width = width
+                if path.name.endswith('PRD.md') and table_width is not None:
+                    if number < len(document_lines) and re.match(r'^\|[\s:|\-]+\|$', document_lines[number]):
+                        cells = tuple(c.strip() for c in line.strip('|').split('|'))
+                        kind = page_table_kind(cells)
+                        if kind and cells != PAGE_TABLE_HEADERS[kind]:
+                            errors.append(f'{path.name}:{number} {kind}表头不符合统一规范')
             else:
                 table_width = None
             heading = re.match(r'^#{2,6} (.+)$', line)
@@ -117,10 +150,9 @@ def review(documents, output_root, expected=None):
 
 
 def main():
-    from export_product_delivery import SOURCES, OUTPUT, export_text, export_readme
+    from export_product_delivery import OUTPUT, generate_delivery
     documents = {p.resolve(): p.read_text() for p in OUTPUT.rglob('*.md')}
-    expected = {dest.resolve(): export_text(src, dest) for src, dest in SOURCES.items()}
-    expected[(OUTPUT / 'README.md').resolve()] = export_readme(expected)
+    expected = generate_delivery()
     result = review(documents, OUTPUT, expected)
     for error in result['errors']:
         print('错误：' + error)

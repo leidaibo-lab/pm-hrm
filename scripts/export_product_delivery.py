@@ -2,6 +2,7 @@
 from pathlib import Path
 import os
 import re
+from urllib.parse import unquote
 
 ROOT = Path(__file__).resolve().parents[1]
 PRODUCT = ROOT / 'docs/product'
@@ -35,7 +36,7 @@ DECISION_NAMES = {
     '033': '简历自动当前规则', '034': '应聘职位固定规则', '035': '场次实际开始规则',
     '036': '筛选与邀约规则', '037': '计划与实际场次规则', '038': '评价与决策字段规则',
     '039': '任务消息与治理规则', '040': '阶段任务统计规则',
-    '041': '内推渠道', '042': '面试先安排后指派规则', '043': '审计日期筛选规则',
+    '041': '内推渠道', '042': '面试先安排后指派规则', '043': '审计日期筛选规则', '044': '角色与权限配置规则',
 }
 DECISION_REF = r'(?<![A-Za-z0-9_-])D-\d{3}(?:(?:至|到|[／/、])(?:D-)?\d{2,3})*'
 
@@ -107,7 +108,7 @@ def requirement_reader_text(text):
         line = ''.join(parts)
         line = line.replace('最小配置方案', '面试流程配置').replace('最小配置矩阵', '默认流程配置表').replace('按最小配置支持组', '按默认流程支持的职级组').replace('按最小配置填写', '按场次字段要求填写').replace('最小配置', '面试流程配置')
         line = re.sub(r'(?:验收引用|正式场景|验收见)\s*[；，、。]', '', line)
-        line = re.sub(r'(?:验收引用|验收见|正式场景|关联)\s*$', '', line)
+        line = re.sub(r'(?:验收引用|验收见|正式场景|(?<=\s)关联)\s*$', '', line)
         line = re.sub(r'验收入口见(\[[^\]]+\]\([^)]*\))中的\s*和\s*。', r'详细验收步骤见\1。', line)
         line = line.replace('HR负责人既有动作沿。', '').replace('正式场景待执行。', '').replace('，均待执行。', '。')
         line = re.sub(r'[；，、]{2,}', '；', line)
@@ -196,36 +197,50 @@ def expand_delivery_sections(source):
 def delivery_scope_text(text, destination):
     """内部维护方法不进入正式需求；当前业务要求与验收保留。"""
     if destination.name == '字段与表单校验规范.md':
+        # 字典编辑规则在正式包中集中呈现于字典管理，权威源仍为公共规范。
+        text = re.sub(r'(?:<a id="字典停用值的历史编辑d-030"></a>\s*)?## 字典停用值的历史编辑\n.*?(?=^## |\Z)', '', text, flags=re.S | re.M)
         text = re.sub(r'## 模块例外\n.*?(?=## 追加公共验收规则)',
                       '## 规则适用\n\n字段格式与错误反馈按本规范执行；模块PRD中更严格的业务条件与本规范共同校验。\n\n', text, flags=re.S)
     elif destination.name == '权限与数据治理规范.md':
         text = re.sub(r'### 3.3 PRD 表述与验收格式\n.*?(?=<a id="34-)',
-                      '### 3.3 授权验收要求\n\n每项操作验证合法授权、缺少角色、记录越界、指派失效及状态不允许等适用路径。角色、部门及指派变化后重新判断当前授权；页面、列表、搜索、工作台和附件的拒绝反馈均不得泄露敏感信息。\n\n', text, flags=re.S)
+                      '### 3.3 授权验收要求\n\n每项操作验证合法授权、缺少动作权限、记录越界、指派失效及状态不允许等适用路径。角色、部门及指派变化后重新判断当前授权；页面、列表、搜索、工作台和附件的拒绝反馈均不得泄露敏感信息。\n\n', text, flags=re.S)
         text = re.sub(r'### 4.1 产品文档与参考资料脱敏\n.*?(?=## 五、)', '', text, flags=re.S)
         text = re.sub(r'## 七、模块落地要求\n.*?(?=招聘管理模块的)', '## 七、招聘业务规则\n\n', text, flags=re.S)
         text = text.replace('- 模块 PRD 必须提供角色、数据范围和操作权限矩阵，不得只描述页面可见性。\n', '')
         text = text.replace('模块需要区分“允许”“禁止”和“待确认”，并将待确认项列入需求评审。', '未明确的授权范围须在开放对应操作前确认。')
         text = text.replace('模块按钮矩阵明确页面、动作、授权引用、业务条件、确认、成功／失败反馈及验收。', '')
+    if destination.name == '基础资料管理PRD.md':
+        text = text.replace('；[字典停用值的历史编辑](基础资料管理PRD.md#dictionary-history)沿公共规范。', '。')
     if destination.name in ('招聘管理PRD.md', '基础资料管理PRD.md') and '## 版本与变更记录' in text:
-        body, history = text.split('## 版本与变更记录', 1)
+        pattern = r'^## 版本与变更记录\n[\s\S]*?(?=^## |\Z)'
+        match = re.search(pattern, text, re.M)
+        history = match[0]
+        trailing = re.search(r'(?:\s*<a id="[^"]+"></a>)+\s*$', history)
+        tail = trailing[0] if trailing else ''
         rows = re.findall(r'^\| (\d+\.\d+)[^\n]*$', history, re.M)
         current = max(rows, key=lambda v: tuple(map(int, v.split('.'))))
         latest = next(line for line in history.splitlines() if line.startswith('| ' + current + '／'))
-        text = body.rstrip() + '\n\n## 版本与变更记录\n\n| 版本／日期 | 变更与交付影响 |\n| --- | --- |\n' + latest + '\n'
+        summary = '## 版本与变更记录\n\n| 版本／日期 | 变更与交付影响 |\n| --- | --- |\n' + latest + '\n\n'
+        text = text[:match.start()] + summary + tail + text[match.end():]
     return text
 
 
 def export_text(source, destination):
     text = expand_delivery_sections(source)
+    text = re.sub(r'<!-- delivery:internal:start -->.*?<!-- delivery:internal:end -->', '', text, flags=re.S)
     if source.name == '产品总览.md':
         text = text.split('<!-- delivery:overview:start -->', 1)[1].split('<!-- delivery:overview:end -->', 1)[0].strip()
         text = '# 产品项目总览\n\n' + text
 
     def replace_link(match):
         path, separator, fragment = match[2].partition('#')
-        if not path or re.match(r'^[a-zA-Z]+:', path):
+        if re.match(r'^[a-zA-Z]+:', path):
             return match[0]
-        target = (source.parent / path).resolve()
+        target = (source.parent / path).resolve() if path else source.resolve()
+        if not path and not (target == PRODUCT / '公共规范/字段与表单校验规范.md' and fragment == '字典停用值的历史编辑d-030'):
+            return match[0]
+        if target == PRODUCT / '公共规范/字段与表单校验规范.md' and fragment == '字典停用值的历史编辑d-030':
+            target, fragment = OUTPUT / '基础资料管理PRD.md', 'dictionary-history'
         target = SOURCES.get(target, target)
         relative = os.path.relpath(target, destination.parent)
         return '[' + match[1] + '](' + relative + ('#' + fragment if separator else '') + ')'
@@ -264,24 +279,120 @@ def export_readme(generated):
 | 顺序 | 文档 | 内容 |
 | --- | --- | --- |
 | 1 | [产品项目总览](产品项目总览.md) | 产品目标、范围、角色、业务架构、数据流与实施依赖 |
-| 2 | [基础资料管理PRD](基础资料管理PRD.md) | 人员、账号、部门、字典，以及登录、工作台、消息、审计和回收页面 |
+| 2 | [基础资料管理PRD](基础资料管理PRD.md) | 人员、账号、角色及权限／数据范围、部门、字典，以及登录、工作台、消息、审计和回收页面 |
 | 3 | [招聘管理PRD](招聘管理PRD.md) | 职位与应聘资料、筛选邀约、场次、评价决策、待办提醒及异常 |
 | 4 | [招聘管理验收附件](招聘管理验收附件.md) | 需求追踪、测试步骤和预期结果 |
 
+角色与授权阅读入口：[角色配置与人员分配](基础资料管理PRD.md#shared-exceptions)提供完整操作路径、操作入口及页面定位；[编辑角色弹窗](基础资料管理PRD.md#person-role-assignment)定义人员绑定的输入、保存与取消。变更影响见基础资料PRD文档信息下方的版本记录，研发／测试重点核对绑定、生效及失败保护。
+
 公共校验、授权、审计和数据生命周期要求见[字段与表单校验规范](公共规范/字段与表单校验规范.md)及[权限与数据治理规范](公共规范/权限与数据治理规范.md)。统计复算与试点效果评估见[指标与试点基线](指标与试点基线.md)。
 
-[可点击原型](prototype/index.html)使用虚构数据，刷新后重置。用于演示页面及样例流程；多轮快照、换人／替代、前轮迟交、CTO不参与、合并、真实通知与服务端鉴权未完整模拟，以PRD及验收附件为实现依据。
+[可点击原型](prototype/index.html)使用虚构数据，刷新后重置。用于页面导航及样例流程演示，功能及授权验收以PRD与验收附件为依据。
 
-面试安排采用HR先保存候选人及计划时间、职位已有用人负责人随后指派面试官；审计默认查询包含今天的7个自然日期。内推资料接收与实际沟通确认方式尚待业务落实，影响对应渠道的实施。演示原型尚未完整对齐最新页面规格。需求联合评审与实现验收尚未执行。
+面试安排采用HR先保存候选人及计划时间、职位已有用人负责人随后指派面试官；审计默认查询包含今天的7个自然日期。内推由HR从公司认可的内部渠道接收简历，在系统外确认邀约及可入职意愿后记录结果。验收执行结果见验收附件。
 """
 
+
+
+LINK_PATTERN = re.compile(r'\[([^\]\n]*)\]\(([^)\n]+)\)')
+ANCHOR_PATTERN = re.compile(r'<a\s+id="([^"]+)"\s*></a>')
+
+
+def simplify_delivery_navigation(documents):
+    """整包统一定位，内部兼容锚点不进入正式输出。"""
+    aliases, positions = {}, {}
+    for path, text in documents.items():
+        mapping, locations = {}, {}
+        # 只有紧邻标题的兼容标识才合并，不能把正文中的不同目标合并。
+        pending = []
+        fenced = False
+        for number, line in enumerate(text.splitlines(), 1):
+            if line.startswith('```'):
+                fenced = not fenced
+            if fenced:
+                pending = []
+                continue
+            anchor = re.fullmatch(r'<a\s+id="([^"]+)"\s*></a>', line)
+            if anchor:
+                pending.append((anchor[1], number))
+                continue
+            heading = re.match(r'^#{1,6}\s+(.+)$', line)
+            if heading:
+                title = heading[1]
+                slug = re.sub(r'[^\w\-\s]', '', title.lower()).replace(' ', '-')
+                # 验收以场景编号提供稳定入口，不携带旧中文标题或讨论措辞。
+                scenario = re.match(r'(TS-[A-Z]+-\d+)[:：]', title)
+                clean = [a for a, _ in pending if re.fullmatch(r'[a-z][a-z0-9]*(?:-[a-z0-9]+)*', a)
+                         and not re.search(r'(?:^|-)d-\d+', a)]
+                canonical = scenario[1].lower() if scenario else (clean[0] if clean else slug)
+                mapping[slug] = canonical
+                locations[canonical] = number
+                for alias, _ in pending:
+                    mapping[alias] = canonical
+                pending = []
+            elif line.strip():
+                pending = []
+        for match in ANCHOR_PATTERN.finditer(text):
+            mapping.setdefault(match[1], match[1])
+        # 去掉正文内紧邻目标的链接；文字仍保留，顶部阅读索引保持可点击。
+        def nearby(match):
+            if path.name not in ('招聘管理PRD.md', '基础资料管理PRD.md') or not match[2].startswith('#'):
+                return match[0]
+            line = text[:match.start()].count('\n') + 1
+            target = locations.get(mapping.get(unquote(match[2][1:]), ''))
+            if line > 30 and target is not None and abs(line - target) <= 35:
+                return match[1]
+            return match[0]
+        documents[path] = LINK_PATTERN.sub(nearby, text)
+        aliases[path], positions[path] = mapping, locations
+
+    needed = {path: set() for path in documents}
+    for path, text in documents.items():
+        def rewrite(match):
+            local, sep, fragment = match[2].partition('#')
+            if not sep or re.match(r'^[a-zA-Z][\w+.-]*:', local):
+                return match[0]
+            target = (path.parent / unquote(local)).resolve() if local else path
+            if target not in aliases:
+                return match[0]
+            old = unquote(fragment)
+            canonical = aliases[target].get(old, old)
+            needed[target].add(canonical)
+            return '[' + match[1] + '](' + local + '#' + canonical + ')'
+        documents[path] = LINK_PATTERN.sub(rewrite, text)
+
+    for path, text in documents.items():
+        kept = set()
+        def keep_anchor(match):
+            canonical = aliases[path][match[1]]
+            if canonical not in needed[path] or canonical in kept:
+                return ''
+            kept.add(canonical)
+            return '<a id="' + canonical + '"></a>'
+        text = ANCHOR_PATTERN.sub(keep_anchor, text)
+        # 场景可直接定位；被引用的自动标题目标也明确输出，避免依赖阅读器差异。
+        lines = text.splitlines()
+        for canonical, number in sorted(positions[path].items(), key=lambda item: item[1], reverse=True):
+            if canonical in kept or (canonical not in needed[path] and not canonical.startswith('ts-')):
+                continue
+            # 删除锚点未删除行，此时行号保持不变。
+            lines.insert(number - 1, '<a id="' + canonical + '"></a>\n')
+            kept.add(canonical)
+        text = '\n'.join(lines)
+        documents[path] = re.sub(r'\n{3,}', '\n\n', text).strip() + '\n'
+    return documents
+
+
+def generate_delivery():
+    generated = {destination.resolve(): export_text(source, destination)
+                 for source, destination in SOURCES.items()}
+    generated[(OUTPUT / 'README.md').resolve()] = export_readme(generated)
+    return simplify_delivery_navigation(generated)
 
 def main():
     OUTPUT.mkdir(parents=True, exist_ok=True)
     from check_product_delivery import review
-    generated = {destination.resolve(): export_text(source, destination)
-                 for source, destination in SOURCES.items()}
-    generated[(OUTPUT / 'README.md').resolve()] = export_readme(generated)
+    generated = generate_delivery()
     documents = {path.resolve(): path.read_text() for path in OUTPUT.rglob('*.md')}
     documents.update(generated)
     result = review(documents, OUTPUT)
